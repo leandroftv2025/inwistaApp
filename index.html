@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inwista • Banco Digital</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="app.js"></script>
+  
+  <!-- Botpress Webchat Integration - Atendimento Inwista -->
+  <script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+  <script src="https://files.bpcontent.cloud/2025/07/30/19/20250730192657-2O08O50P.js" defer></script>
+  
+  <style>
+    /* Customização do botão do chat Botpress */
+    #bp-web-widget-container {
+      z-index: 10000 !important;
+    }
+    
+    #bp-web-widget {
+      bottom: 20px !important;
+      right: 20px !important;
+    }
+    
+    .bp-widget-side {
+      z-index: 9999 !important;
+    }
+    
+    /* Ajuste responsivo para mobile */
+    @media (max-width: 768px) {
+      #bp-web-widget {
+        bottom: 15px !important;
+        right: 15px !important;
+      }
+    }
+  </style>
+</body>
+</html>
