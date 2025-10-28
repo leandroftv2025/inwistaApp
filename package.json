@@ -1,0 +1,35 @@
+{
+  "name": "inwista-app",
+  "version": "2.0.0",
+  "description": "Aplicação bancária digital com suporte a criptomoedas",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
+  },
+  "keywords": [
+    "banco-digital",
+    "criptomoedas",
+    "fintech",
+    "spa"
+  ],
+  "author": "Inwista Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitest/ui": "^1.0.4",
+    "@vitest/coverage-v8": "^1.0.4",
+    "eslint": "^8.55.0",
+    "jsdom": "^23.0.1",
+    "vite": "^5.0.8",
+    "vitest": "^1.0.4"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.1"
+  }
+}
