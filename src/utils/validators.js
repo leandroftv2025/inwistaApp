@@ -18,7 +18,7 @@ export function validarCPF(cpf) {
 
   // CPFs de teste - aceitar para demonstração (verificar ANTES das outras validações)
   // TODO: Remover em produção
-  const testCPFs = ['12345678900', '98765432100', '11122233344', '12312312312', '99999999999'];
+  const testCPFs = ['12345678900', '98765432100', '11122233344', '12312312312', '55566677788'];
   if (testCPFs.includes(cpf)) return true;
 
   // Verifica se todos os dígitos são iguais (CPF inválido)

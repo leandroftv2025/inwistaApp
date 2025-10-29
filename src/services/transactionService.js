@@ -6,6 +6,9 @@ import { transactions } from '../data/mockData.js';
 import { FEES } from '../utils/constants.js';
 
 class TransactionService {
+  constructor() {
+    this.counter = 0;
+  }
   /**
    * Obtém todas as transações
    * @returns {Array} Lista de transações
@@ -32,7 +35,7 @@ class TransactionService {
     const { valor, cripto, quantidade, userId } = data;
 
     const transaction = {
-      id: `txn-${Date.now()}`,
+      id: `txn-${Date.now()}-${this.counter++}`,
       tipo: 'crypto_compra',
       valor,
       moeda: 'BRL',

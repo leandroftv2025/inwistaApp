@@ -39,7 +39,7 @@ describe('AuthService', () => {
     });
 
     it('deve rejeitar usuário não encontrado', () => {
-      const result = authService.validateCredentials('99999999999', '1234');
+      const result = authService.validateCredentials('55566677788', '1234');
       expect(result.success).toBe(false);
       expect(result.error).toContain('não encontrado');
     });

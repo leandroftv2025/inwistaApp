@@ -8,11 +8,13 @@
  * @returns {string} Valor formatado (ex: R$ 1.234,56)
  */
 export function formatBRL(value) {
-  return value.toLocaleString("pt-BR", {
+  const formatted = value.toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
     minimumFractionDigits: 2,
   });
+  // Substitui espaço não-quebrável (U+00A0) por espaço normal
+  return formatted.replace(/\u00A0/g, ' ');
 }
 
 /**
@@ -40,11 +42,21 @@ export function formatDate(date) {
 /**
  * Formata CPF (000.000.000-00)
  * @param {string} cpf - CPF sem formatação
- * @returns {string} CPF formatado
+ * @returns {string} CPF formatado (ou parcialmente formatado)
  */
 export function formatCPF(cpf) {
   cpf = cpf.replace(/[^\d]/g, '');
-  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+
+  // Formata parcialmente conforme o usuário digita
+  if (cpf.length <= 3) {
+    return cpf;
+  } else if (cpf.length <= 6) {
+    return cpf.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+  } else if (cpf.length <= 9) {
+    return cpf.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3-');
+  } else {
+    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }
 }
 
 /**
