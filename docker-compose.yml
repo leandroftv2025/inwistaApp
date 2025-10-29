@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: inwista-postgres
+    environment:
+      POSTGRES_DB: inwista_db
+      POSTGRES_USER: inwista_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - inwista-network
+    restart: unless-stopped
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: inwista-backend
+    environment:
+      PORT: 3001
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: inwista_db
+      DB_USER: inwista_user
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 24h
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: 7d
+      BCRYPT_ROUNDS: 12
+      CORS_ORIGIN: ${FRONTEND_URL}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+    networks:
+      - inwista-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inwista-frontend
+    environment:
+      NODE_ENV: production
+      VITE_API_URL: ${BACKEND_URL}
+    ports:
+      - "5000:5000"
+    depends_on:
+      - backend
+    networks:
+      - inwista-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  inwista-network:
+    driver: bridge
