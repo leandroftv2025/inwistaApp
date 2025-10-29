@@ -4,9 +4,9 @@
   "description": "Aplicação bancária digital com suporte a criptomoedas",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 5000",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --port 5000",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",

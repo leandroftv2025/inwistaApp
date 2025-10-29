@@ -14,8 +14,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 5000,
     open: '/index-modular.html',
+  },
+  preview: {
+    port: 5000,
   },
   resolve: {
     alias: {

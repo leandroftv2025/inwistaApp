@@ -28,7 +28,7 @@ COPY --from=builder /app/package*.json ./
 RUN npm ci --only=production
 
 # Expor porta
-EXPOSE 3000
+EXPOSE 5000
 
 # Comando de inicialização
-CMD ["npm", "run", "preview"]
+CMD ["npm", "run", "preview", "--", "--port", "5000", "--host", "0.0.0.0"]

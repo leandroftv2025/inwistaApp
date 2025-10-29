@@ -55,7 +55,7 @@ services:
       NODE_ENV: production
       VITE_API_URL: ${BACKEND_URL}
     ports:
-      - "3000:3000"
+      - "5000:5000"
     depends_on:
       - backend
     networks:

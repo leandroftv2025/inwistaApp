@@ -49,14 +49,14 @@ npm test
 npm run dev
 
 # Deve aparecer:
-# ➜  Local:   http://localhost:3000
+# ➜  Local:   http://localhost:5000
 ```
 
 **Em outro terminal:**
 
 ```bash
 # Testar se está respondendo
-curl http://localhost:3000
+curl http://localhost:5000
 ```
 
 ### 4️⃣ Configurar Backend
@@ -100,7 +100,7 @@ MAX_LOGIN_ATTEMPTS=3
 LOCK_TIME=5
 
 # CORS
-CORS_ORIGIN=http://localhost:3000
+CORS_ORIGIN=http://localhost:5000
 ```
 
 **Gerar JWT Secrets:**
@@ -358,7 +358,7 @@ curl https://api-inwista.seudominio.com/health
 - **Start Command:** `npm run preview` (ou `npx vite preview`)
 
 **Deployment:**
-- **Port:** `3000`
+- **Port:** `5000`
 - **Protocol:** `HTTP`
 
 **Environment Variables:**
@@ -430,7 +430,7 @@ docker-compose ps
 curl http://localhost:3001/health
 
 # Testar frontend
-curl http://localhost:3000
+curl http://localhost:5000
 ```
 
 ---
@@ -472,7 +472,7 @@ server {
     server_name inwista.seudominio.com;
 
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:5000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -628,7 +628,7 @@ docker-compose build frontend
 docker-compose up -d frontend
 
 # Ver se porta está escutando
-netstat -tuln | grep 3000
+netstat -tuln | grep 5000
 ```
 
 ### Problema: Testes não passam
@@ -721,7 +721,7 @@ docker-compose up -d
 
 ### Problemas com Deploy?
 1. Verificar logs: `docker-compose logs -f`
-2. Verificar portas: `netstat -tuln | grep -E "3000|3001|5432"`
+2. Verificar portas: `netstat -tuln | grep -E "5000|3001|5432"`
 3. Verificar firewall: `sudo ufw status`
 
 ### Easypanel não está acessível?

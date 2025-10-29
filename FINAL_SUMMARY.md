@@ -90,7 +90,7 @@ npm run test:coverage    # Relatório de cobertura
 ## ⚙️ FASE 3: BUILD SYSTEM (Concluída)
 
 ### Vite Configurado
-- ✅ Dev server (porta 3000)
+- ✅ Dev server (porta 5000)
 - ✅ Build otimizado
 - ✅ Aliases de imports
 - ✅ Code splitting ready
@@ -265,7 +265,7 @@ npm run test:coverage     # Com coverage
 ### 3. Desenvolvimento
 ```bash
 # Frontend (Vite)
-npm run dev               # http://localhost:3000
+npm run dev               # http://localhost:5000
 
 # Backend
 cd backend
