@@ -16,13 +16,13 @@ export function validarCPF(cpf) {
   // Verifica se tem 11 dígitos
   if (cpf.length !== CONFIG.VALIDATION.CPF_LENGTH) return false;
 
+  // CPFs de teste - aceitar para demonstração (verificar ANTES das outras validações)
+  // TODO: Remover em produção
+  const testCPFs = ['12345678900', '98765432100', '11122233344', '12312312312', '99999999999'];
+  if (testCPFs.includes(cpf)) return true;
+
   // Verifica se todos os dígitos são iguais (CPF inválido)
   if (/^(\d)\1{10}$/.test(cpf)) return false;
-
-  // CPFs de teste - aceitar para demonstração
-  // TODO: Remover em produção
-  const testCPFs = ['12345678900', '98765432100', '11122233344'];
-  if (testCPFs.includes(cpf)) return true;
 
   // Validação do primeiro dígito verificador
   let soma = 0;
@@ -110,11 +110,45 @@ export function getPasswordStrength(password) {
   }
 
   let strength = 0;
-  if (password.length >= 6) strength++;
-  if (password.length >= 10) strength++;
-  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
-  if (/\d/.test(password)) strength++;
-  if (/[^a-zA-Z\d]/.test(password)) strength++;
+
+  // Senhas muito curtas são sempre "Muito fraca"
+  if (password.length < 6) {
+    return {
+      strength: 0,
+      label: 'Muito fraca',
+      color: '#EF4444'
+    };
+  }
+
+  // A partir daqui, a senha tem pelo menos 6 caracteres
+  strength = 1; // "Fraca" por padrão
+
+  // Aumenta para "Média" se tem 10+ caracteres
+  if (password.length >= 10) {
+    strength = 2;
+  }
+
+  // Verifica complexidade
+  const hasLower = /[a-z]/.test(password);
+  const hasUpper = /[A-Z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSpecial = /[^a-zA-Z\d]/.test(password);
+
+  let complexityCount = 0;
+  if (hasLower) complexityCount++;
+  if (hasUpper) complexityCount++;
+  if (hasNumber) complexityCount++;
+  if (hasSpecial) complexityCount++;
+
+  // Se tem maiúsculas, minúsculas E números (3 tipos), é "Forte"
+  if (hasLower && hasUpper && hasNumber) {
+    strength = 3;
+  }
+
+  // Se tem todos os 4 tipos E 10+ caracteres, é "Muito forte"
+  if (complexityCount >= 4 && password.length >= 10) {
+    strength = 4;
+  }
 
   const levels = ['Muito fraca', 'Fraca', 'Média', 'Forte', 'Muito forte'];
   const colors = ['#EF4444', '#F59E0B', '#FCD34D', '#10B981', '#059669'];
