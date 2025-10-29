@@ -417,6 +417,12 @@ pre code {
   color: var(--color-btn-primary-text);
 }
 
+.btn--surface {
+  background: rgba(var(--color-teal-500-rgb, 33, 128, 141), 0.12);
+  color: var(--color-primary);
+  border: 1px solid rgba(var(--color-teal-500-rgb, 33, 128, 141), 0.2);
+}
+
 .btn--primary:hover {
   background: var(--color-primary-hover);
 }
@@ -1905,6 +1911,154 @@ select.form-control { padding: var(--space-8) var(--space-12); appearance: none;
   top: auto;
   right: auto;
   pointer-events: all;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+}
+
+.grid {
+  display: grid;
+  gap: var(--space-16);
+}
+
+.grid--dashboard {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.grid--two-columns {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.biometric-icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-16);
+}
+
+.biometric-card {
+  position: relative;
+  width: 100%;
+  padding-top: 70%;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--color-border);
+  background: rgba(var(--color-teal-500-rgb), 0.05);
+  overflow: hidden;
+  margin-bottom: var(--space-16);
+}
+
+.biometric-card video,
+.biometric-card canvas,
+.biometric-card .biometric-placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.biometric-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-8);
+  color: var(--color-text-secondary);
+  background: repeating-linear-gradient(
+      45deg,
+      rgba(var(--color-teal-500-rgb), 0.08),
+      rgba(var(--color-teal-500-rgb), 0.08) 10px,
+      transparent 10px,
+      transparent 20px
+    ),
+    rgba(var(--color-primary-rgb, 33, 128, 141), 0.06);
+}
+
+.biometric-guidelines span {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+}
+
+.biometric-guidelines small {
+  font-size: var(--font-size-sm);
+}
+
+.biometric-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  justify-content: center;
+  margin-bottom: var(--space-16);
+}
+
+.biometric-status {
+  min-height: 24px;
+  margin-bottom: var(--space-16);
+  font-size: var(--font-size-sm);
+}
+
+.biometric-status.success {
+  color: var(--color-success);
+}
+
+.biometric-status.error {
+  color: var(--color-error);
+}
+
+.biometric-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vertical-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.simulation-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-12);
+  border-radius: var(--radius-base);
+  background: rgba(var(--color-slate-500-rgb, 98, 108, 113), 0.08);
+  font-size: var(--font-size-sm);
+}
+
+.summary-row span {
+  color: var(--color-text-secondary);
+}
+
+.summary-row strong {
+  font-size: var(--font-size-base);
+}
+
+.btn--link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+}
+
+.btn--link:hover {
+  color: var(--color-primary-hover);
+}
+
+.hidden {
+  display: none !important;
 }
 
 @media (max-width: 767px) {

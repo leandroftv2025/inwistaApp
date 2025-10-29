@@ -1,0 +1,10 @@
+{
+  "name": "inwista-app",
+  "version": "1.0.0",
+  "description": "MVP bancário com front-end responsivo e backend REST/GraphQL simulado",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT"
+}

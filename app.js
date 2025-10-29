@@ -1,6 +1,216 @@
 // INWISTA – SPA SIMULADA
 
 /****************************
+ * Integração com Backend (REST/GraphQL)
+ ***************************/
+const API_BASE_URL = "http://localhost:3000/api";
+const GRAPHQL_ENDPOINT = "http://localhost:3000/api/graphql";
+
+async function apiRequest(path, { method = "GET", body, headers = {}, fallback } = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...headers,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: "Erro inesperado" }));
+      throw new Error(error.message || "Erro inesperado");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.warn("API fallback:", error.message);
+    if (typeof fallback === "function") {
+      return fallback(error);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function graphqlRequest(query, variables = {}, fallback) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const response = await fetch(GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query, variables }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error("Falha na requisição GraphQL");
+    }
+
+    const payload = await response.json();
+    if (payload.errors) {
+      throw new Error(payload.errors[0]?.message || "Erro GraphQL");
+    }
+    return payload.data;
+  } catch (error) {
+    if (typeof fallback === "function") {
+      return fallback(error);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+const apiClient = {
+  async login(identifier, password) {
+    return apiRequest("/auth/login", {
+      method: "POST",
+      body: { identifier, password },
+      fallback: () => {
+        const type = detectInputType(identifier);
+        let user = null;
+
+        if (type === "cpf") {
+          user = users.find((u) => u.cpf === identifier.replace(/[^\d]/g, ""));
+        } else if (type === "email") {
+          user = users.find((u) => u.email === identifier);
+        } else {
+          user = users.find((u) => u.username === identifier);
+        }
+
+        if (!user || user.senha !== password) {
+          throw new Error("Credenciais inválidas");
+        }
+
+        return {
+          user: { ...user, senha: undefined },
+          requires2fa: true,
+          twoFactorToken: "offline-demo",
+          biometricRequired: true,
+          biometricToken: "offline-demo",
+        };
+      },
+    });
+  },
+
+  async verify2FA(twoFactorToken, code) {
+    return apiRequest("/auth/2fa", {
+      method: "POST",
+      body: { twoFactorToken, code },
+      fallback: () => {
+        if (code === "123456") {
+          return { success: true };
+        }
+        throw new Error("Código inválido");
+      },
+    });
+  },
+
+  async verifyBiometry(biometricToken, payload) {
+    return apiRequest("/auth/biometry", {
+      method: "POST",
+      body: { biometricToken, payload },
+      fallback: () => ({ success: true, score: 0.98 }),
+    });
+  },
+
+  async fetchMarket() {
+    const query = `
+      query MarketSnapshot {
+        marketSnapshot {
+          symbol
+          name
+          price
+          change24h
+          volume24h
+        }
+      }
+    `;
+
+    const result = await graphqlRequest(query, {}, () => ({
+      marketSnapshot: cryptos.map((c) => ({
+        symbol: c.simbolo,
+        name: c.nome,
+        price: c.preco_usd,
+        change24h: c.variacao_24h,
+        volume24h: c.volume_24h,
+      })),
+    }));
+
+    return result.marketSnapshot;
+  },
+
+  async fetchDashboard(userId) {
+    return apiRequest(`/users/${userId}/dashboard`, {
+      fallback: () => ({
+        balances: {
+          brl: currentUser?.saldo_brl ?? 0,
+          usd: currentUser?.saldo_usd ?? 0,
+          crypto: 3.42,
+        },
+        recentTransactions: transactions,
+        compliance: { status: "Aprovado", score: 92 },
+      }),
+    });
+  },
+
+  async simulateTransaction(payload) {
+    return apiRequest("/transactions/simulate", {
+      method: "POST",
+      body: payload,
+      fallback: () => {
+        const taxa = taxas[payload.tipo] ?? 0;
+        const tarifa = payload.valor * (taxa / 100);
+        const total = payload.tipo === "pix" ? payload.valor : payload.valor + tarifa;
+
+        if (payload.valor <= 0) {
+          throw new Error("Valor inválido");
+        }
+
+        if (payload.valor > currentUser.saldo_brl) {
+          throw new Error("Saldo insuficiente");
+        }
+
+        return {
+          approved: true,
+          fees: tarifa,
+          total,
+          receipt: {
+            protocolo: `SIM-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            tipo: payload.tipo,
+            favorecido: payload.destinatario,
+            valor: payload.valor,
+            taxa: tarifa,
+            total,
+          },
+        };
+      },
+    });
+  },
+
+  async exportReport() {
+    return apiRequest("/admin/reports/export", {
+      fallback: () => ({
+        mime: "text/csv",
+        content: "tipo,valor,status\nPIX,500,completed",
+        filename: "relatorio-inwista.csv",
+      }),
+    });
+  },
+};
+
+/****************************
  * Dados simulados
  ***************************/
 const users = [
@@ -39,7 +249,7 @@ const users = [
   },
 ];
 
-const cryptos = [
+let cryptos = [
   {
     nome: "Bitcoin",
     simbolo: "BTC",
@@ -82,7 +292,7 @@ const cryptos = [
   },
 ];
 
-const transactions = [
+let transactions = [
   {
     id: "txn-001",
     tipo: "pix_recebido",
@@ -129,10 +339,15 @@ const taxas = {
  * Estado & helpers
  ***************************/
 let currentUser = null;
-let currentView = "login"; // login, 2fa, dashboard, explore, transactions, assets, admin
+let currentView = "login"; // login, 2fa, biometric, dashboard, explore, transactions, assets, admin
 let loginAttempts = 0;
 let isBlocked = false;
 let blockUntil = null;
+let twoFactorSession = null;
+let biometricSession = null;
+let dashboardData = null;
+let marketSnapshot = [];
+let lastSimulation = null;
 
 function $(selector) {
   return document.querySelector(selector);
@@ -335,10 +550,15 @@ function render() {
       app.innerHTML = render2FA();
       attach2FAEvents();
       break;
+    case "biometric":
+      app.innerHTML = renderBiometric();
+      attachBiometricEvents();
+      break;
     case "dashboard":
       app.innerHTML = renderLayout(renderHome());
       attachGlobalEvents();
       drawSparklines();
+      hydrateDashboard();
       break;
     case "explore":
       app.innerHTML = renderLayout(renderExplore());
@@ -347,6 +567,8 @@ function render() {
     case "transactions":
       app.innerHTML = renderLayout(renderTransactions());
       attachGlobalEvents();
+      attachTransactionEvents();
+      hydrateTransactions();
       break;
     case "assets":
       app.innerHTML = renderLayout(renderAssets());
@@ -460,6 +682,35 @@ function render2FA() {
         <button class="btn btn--sm btn--outline" id="resend-email">Enviar por Email</button>
         <span id="timer" class="ml-8">60s</span>
       </div>
+  </div>
+</div>`;
+}
+
+function renderBiometric() {
+  return `
+  <div class="full-height">
+    <div class="centered" style="max-width:420px;width:100%;text-align:center;">
+      <div class="biometric-icon">👤</div>
+      <h2 class="mb-8">Verificação Biométrica Facial</h2>
+      <p class="mb-16">Posicione o rosto na área indicada ou envie uma selfie recente para validar o acesso.</p>
+      <div class="biometric-card">
+        <video id="biometric-video" autoplay playsinline muted class="hidden"></video>
+        <canvas id="biometric-canvas" class="hidden"></canvas>
+        <div id="biometric-placeholder" class="biometric-placeholder">
+          <div class="biometric-guidelines">
+            <span>Enquadre o rosto</span>
+            <small>Iluminação frontal, mantenha-se imóvel.</small>
+          </div>
+        </div>
+      </div>
+      <div class="biometric-actions">
+        <button class="btn btn--primary" id="start-biometric">Iniciar captura</button>
+        <label class="btn btn--outline" for="biometric-upload">Enviar selfie</label>
+        <input type="file" accept="image/*" id="biometric-upload" class="hidden" />
+      </div>
+      <div id="biometric-status" class="biometric-status"></div>
+      <button class="btn btn--primary btn--full-width" id="confirm-biometric" disabled>Confirmar identidade</button>
+      <button class="btn btn--link" id="skip-biometric">Validar depois</button>
     </div>
   </div>`;
 }
@@ -501,17 +752,58 @@ function renderSidebar() {
 }
 
 function renderHome() {
+  const balances = dashboardData?.balances ?? {
+    brl: currentUser?.saldo_brl ?? 0,
+    usd: currentUser?.saldo_usd ?? 0,
+    crypto: dashboardData?.balances?.crypto ?? 0,
+  };
+
+  const compliance = dashboardData?.compliance ?? { status: "Em análise", score: 85 };
+
   return `
     <header class="main__header"><h2>Bem-vindo, ${currentUser.nome}</h2><div>${formatBRL(
-    currentUser.saldo_brl
+    balances.brl
   )}</div></header>
     <section class="p-16">
-      <h3 class="mb-16">Mercado</h3>
+      <div class="grid grid--dashboard">
+        <div class="card card--primary-gradient">
+          <div>
+            <div class="metric__value" id="dashboard-balance-brl">${formatBRL(balances.brl)}</div>
+            <div class="metric__label">Saldo disponível</div>
+          </div>
+          <button class="btn btn--surface" id="quick-withdraw">Sacar agora</button>
+        </div>
+        <div class="card card--surface">
+          <h4>Resumo de carteiras</h4>
+          <ul class="list">
+            <li><span>Saldo em USD</span><span id="dashboard-balance-usd">${formatUSD(balances.usd)}</span></li>
+            <li><span>Criptoativos</span><span id="dashboard-crypto-btc">${(balances.crypto ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} BTC</span></li>
+            <li><span>Saldo protegido</span><span>${formatBRL(1200)}</span></li>
+          </ul>
+        </div>
+        <div class="card card--surface">
+          <h4>Compliance</h4>
+          <p>Status: <span class="badge badge--success" id="dashboard-compliance-status">${compliance.status}</span></p>
+          <p>Score: <strong id="dashboard-compliance-score">${compliance.score}%</strong></p>
+          <button class="btn btn--outline btn--sm" id="download-compliance">Exportar relatório</button>
+        </div>
+      </div>
+    </section>
+    <section class="p-16">
+      <div class="section-header">
+        <h3 class="mb-16">Mercado em tempo real</h3>
+        <button class="btn btn--outline btn--sm" id="refresh-market">Atualizar cotações</button>
+      </div>
       <div style="overflow-x:auto;">
         <table class="table" id="crypto-table">
           <thead>
             <tr>
-              <th>Nome</th><th>Preço (USD)</th><th></th><th>Volume 24h</th><th>Variação %</th><th></th>
+              <th>Nome</th>
+              <th>Preço (USD)</th>
+              <th></th>
+              <th>Volume 24h</th>
+              <th>Variação %</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -539,9 +831,48 @@ function renderExplore() {
 }
 
 function renderTransactions() {
-  return `<header class="main__header"><h2>Transações</h2></header>
+  return `
+  <header class="main__header"><h2>Transações</h2></header>
   <div class="p-16">
-    ${transactions.length === 0 ? renderEmptyState() : renderTransactionsTable()}
+    <div class="grid grid--two-columns">
+      <div class="card card--surface">
+        <h3 class="mb-16">Simulador PIX / TED / TEF</h3>
+        <form id="simulation-form" class="vertical-form">
+          <div class="form-group">
+            <label class="form-label" for="simulation-type">Tipo de operação</label>
+            <select id="simulation-type" class="form-control">
+              <option value="pix">PIX Imediato</option>
+              <option value="ted">TED</option>
+              <option value="tef">TEF</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="simulation-value">Valor (BRL)</label>
+            <input type="number" id="simulation-value" class="form-control" min="1" step="0.01" placeholder="1500.00" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="simulation-recipient">Favorecido / Chave PIX</label>
+            <input type="text" id="simulation-recipient" class="form-control" placeholder="CPF, CNPJ, e-mail ou agência" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="simulation-description">Descrição</label>
+            <textarea id="simulation-description" class="form-control" placeholder="Observações internas"></textarea>
+          </div>
+          <button type="submit" class="btn btn--primary btn--full-width">Simular operação</button>
+        </form>
+      </div>
+      <div class="card card--surface" id="simulation-result-card">
+        <h3 class="mb-16">Resultado da simulação</h3>
+        <div id="simulation-result">
+          ${lastSimulation ? renderSimulationSummary(lastSimulation) : '<p>Preencha o formulário ao lado para validar limites, taxas e comprovante.</p>'}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="p-16">
+    <div id="transactions-table-wrapper">
+      ${transactions.length === 0 ? renderEmptyState() : renderTransactionsTable()}
+    </div>
   </div>`;
 }
 
@@ -555,6 +886,21 @@ function renderTransactionsTable() {
       }</span></td><td>${new Date(t.data).toLocaleString("pt-BR")}</td></tr>`
     )
     .join("")}</tbody></table>`;
+}
+
+function renderSimulationSummary(simulation) {
+  return `
+    <div class="simulation-summary">
+      <div class="summary-row"><span>Protocolo</span><strong>${simulation.protocolo}</strong></div>
+      <div class="summary-row"><span>Data/Hora</span><strong>${new Date(simulation.timestamp).toLocaleString('pt-BR')}</strong></div>
+      <div class="summary-row"><span>Tipo</span><strong>${simulation.tipo?.toUpperCase()}</strong></div>
+      <div class="summary-row"><span>Favorecido</span><strong>${simulation.favorecido}</strong></div>
+      <div class="summary-row"><span>Valor</span><strong>${formatBRL(simulation.valor)}</strong></div>
+      <div class="summary-row"><span>Taxas</span><strong>${formatBRL(simulation.taxa ?? 0)}</strong></div>
+      <div class="summary-row"><span>Total debitado</span><strong>${formatBRL(simulation.total ?? simulation.valor)}</strong></div>
+      <button class="btn btn--outline btn--full-width" id="download-receipt">Baixar comprovante</button>
+    </div>
+  `;
 }
 
 function badgeClass(status) {
@@ -675,30 +1021,28 @@ function attachLoginEvents() {
   }
   
   // Submit login
-  $('#login-form').addEventListener('submit', (e) => {
+  $('#login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     if (isBlocked) {
       showToast('error', 'Conta Bloqueada', 'Aguarde alguns minutos antes de tentar novamente.');
       return;
     }
-    
+
     const identifier = identifierField.value.trim();
     const password = passwordField.value.trim();
-    
-    // Clear previous errors
+
     clearFieldError('identifier');
     clearFieldError('password');
-    
-    // Validate fields
+
     let hasError = false;
-    
+
     if (!identifier) {
       showFieldError('identifier', 'Campo obrigatório');
       hasError = true;
     } else {
       const type = detectInputType(identifier);
-      
+
       if (type === 'cpf') {
         const cpfClean = identifier.replace(/[^\d]/g, '');
         if (!validarCPF(cpfClean)) {
@@ -717,7 +1061,7 @@ function attachLoginEvents() {
         }
       }
     }
-    
+
     if (!password) {
       showFieldError('password', 'Campo obrigatório');
       hasError = true;
@@ -725,74 +1069,45 @@ function attachLoginEvents() {
       showFieldError('password', 'Senha deve ter no mínimo 4 caracteres');
       hasError = true;
     }
-    
+
     if (hasError) return;
-    
-    // Find user
-    const type = detectInputType(identifier);
-    let user = null;
-    
-    if (type === 'cpf') {
-      const cpfClean = identifier.replace(/[^\d]/g, '');
-      user = users.find(u => u.cpf === cpfClean);
-      
-      if (!user) {
-        showToast('error', 'CPF não encontrado', 'Este CPF não está cadastrado. Deseja criar uma conta?');
-        loginAttempts++;
-        checkLoginAttempts();
-        return;
-      }
-    } else if (type === 'email') {
-      user = users.find(u => u.email === identifier);
-      
-      if (!user) {
-        showToast('error', 'E-mail não encontrado', 'Este e-mail não está cadastrado.');
-        loginAttempts++;
-        checkLoginAttempts();
-        return;
-      }
-    } else if (type === 'username') {
-      user = users.find(u => u.username === identifier);
-      
-      if (!user) {
-        showToast('error', 'Usuário não encontrado', 'Este nome de usuário não existe.');
-        loginAttempts++;
-        checkLoginAttempts();
-        return;
-      }
-    }
-    
-    // Verify password
-    if (user.senha !== password) {
-      loginAttempts++;
-      
-      if (loginAttempts >= 3) {
-        isBlocked = true;
-        blockUntil = Date.now() + (5 * 60 * 1000); // 5 minutes
-        showToast('error', 'Conta Bloqueada', 'Após 3 tentativas incorretas, sua conta foi temporariamente bloqueada por 5 minutos.');
-        render();
-      } else {
-        const remaining = 3 - loginAttempts;
-        showToast('warning', 'Senha Incorreta', `Tentativa ${loginAttempts} de 3. Você tem mais ${remaining} tentativa(s).`);
-      }
-      return;
-    }
-    
-    // Success!
-    loginAttempts = 0;
-    currentUser = { ...user };
-    
-    // Show loading state
+
     const loginBtn = $('#login-btn');
     loginBtn.classList.add('btn--loading');
     loginBtn.disabled = true;
-    
-    showToast('success', 'Login realizado com sucesso!', '');
-    
-    setTimeout(() => {
+
+    try {
+      const result = await apiClient.login(identifier, password);
+      loginAttempts = 0;
+      currentUser = { ...result.user };
+      twoFactorSession = {
+        token: result.twoFactorToken,
+        identifier,
+        attempts: 0,
+      };
+      biometricSession = result.biometricRequired
+        ? { token: result.biometricToken, pending: true }
+        : null;
+
+      showToast('success', 'Credenciais válidas', 'Confirme o código 2FA para prosseguir.');
       currentView = '2fa';
       render();
-    }, 1000);
+    } catch (error) {
+      loginAttempts++;
+      const remaining = Math.max(0, 3 - loginAttempts);
+
+      if (loginAttempts >= 3) {
+        isBlocked = true;
+        blockUntil = Date.now() + 5 * 60 * 1000;
+        showToast('error', 'Conta Bloqueada', 'Após 3 tentativas incorretas, sua conta foi bloqueada por 5 minutos.');
+        render();
+      } else {
+        showToast('error', 'Falha no login', `${error.message || 'Credenciais inválidas'}. Você tem mais ${remaining} tentativa(s).`);
+      }
+    } finally {
+      loginBtn.classList.remove('btn--loading');
+      loginBtn.disabled = false;
+    }
   });
   
   const createAccountBtn = $('#create-account');
@@ -820,22 +1135,51 @@ function attach2FAEvents() {
     if (timerEl) timerEl.textContent = seconds + "s";
     if (seconds <= 0) clearInterval(interval);
   }, 1000);
-  $('#code-form').addEventListener('submit', (e) => {
+  $('#code-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const code = $('#code').value.trim();
-    if (code === '123456') {
-      showToast('success', 'Código verificado!', 'Redirecionando para o dashboard...');
-      setTimeout(() => {
+
+    if (!code || code.length !== 6) {
+      showToast('error', 'Código inválido', 'Informe os 6 dígitos enviados.');
+      return;
+    }
+
+    const submitBtn = $('#code-form button[type="submit"]');
+    submitBtn.classList.add('btn--loading');
+    submitBtn.disabled = true;
+
+    try {
+      await apiClient.verify2FA(twoFactorSession?.token ?? 'offline-demo', code);
+      showToast('success', 'Código verificado!', biometricSession ? 'Vamos validar a biometria.' : 'Redirecionando para o dashboard...');
+
+      twoFactorSession = null;
+      if (biometricSession) {
+        currentView = 'biometric';
+      } else {
         currentView = 'dashboard';
+      }
+      render();
+    } catch (error) {
+      if (!twoFactorSession) {
+        twoFactorSession = { attempts: 0 };
+      }
+      twoFactorSession.attempts += 1;
+      const remaining = Math.max(0, 5 - twoFactorSession.attempts);
+      showToast('error', 'Código Inválido', `${error.message || 'Falha na verificação.'} Restam ${remaining} tentativa(s).`);
+
+      if (twoFactorSession.attempts >= 5) {
+        showToast('error', 'Sessão encerrada', 'Você excedeu o limite de tentativas. Faça login novamente.');
+        currentView = 'login';
         render();
-      }, 1000);
-    } else {
-      showToast('error', 'Código Inválido', 'O código inserido não é válido. Tente novamente.');
+      }
+    } finally {
+      submitBtn.classList.remove('btn--loading');
+      submitBtn.disabled = false;
     }
   });
   const resendBtn = $('#resend');
   const resendEmailBtn = $('#resend-email');
-  
+
   if (resendBtn) {
     resendBtn.addEventListener('click', () => {
       seconds = 60;
@@ -851,21 +1195,247 @@ function attach2FAEvents() {
   }
 }
 
+function attachBiometricEvents() {
+  const startBtn = $("#start-biometric");
+  const uploadInput = $("#biometric-upload");
+  const confirmBtn = $("#confirm-biometric");
+  const skipBtn = $("#skip-biometric");
+  const statusEl = $("#biometric-status");
+  const videoEl = $("#biometric-video");
+  const canvasEl = $("#biometric-canvas");
+  const placeholder = $("#biometric-placeholder");
+
+  let stream = null;
+  let capturedImage = null;
+
+  function enableConfirmation(payloadDescription) {
+    confirmBtn.disabled = false;
+    statusEl.textContent = `Captura pronta (${payloadDescription})`;
+    statusEl.classList.add("success");
+  }
+
+  if (startBtn) {
+    startBtn.addEventListener("click", async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        videoEl.srcObject = stream;
+        videoEl.classList.remove("hidden");
+        placeholder.classList.add("hidden");
+        statusEl.textContent = "Transmitindo vídeo. Clique em Confirmar para capturar.";
+        statusEl.classList.remove("success", "error");
+        capturedImage = null;
+      } catch (error) {
+        statusEl.textContent = "Não foi possível acessar a câmera. Faça upload manual.";
+        statusEl.classList.add("error");
+      }
+    });
+  }
+
+  if (uploadInput) {
+    uploadInput.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        capturedImage = reader.result;
+        placeholder.innerHTML = `<img src="${capturedImage}" alt="Pré-visualização" class="biometric-preview" />`;
+        placeholder.classList.remove("hidden");
+        videoEl?.classList.add("hidden");
+        enableConfirmation("upload");
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", async () => {
+      if (videoEl && !videoEl.classList.contains("hidden") && stream) {
+        const context = canvasEl.getContext("2d");
+        canvasEl.width = videoEl.videoWidth;
+        canvasEl.height = videoEl.videoHeight;
+        context.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+        capturedImage = canvasEl.toDataURL("image/png");
+      }
+
+      if (!capturedImage) {
+        showToast("error", "Capture inválida", "Faça o upload ou inicie a captura.");
+        return;
+      }
+
+      confirmBtn.classList.add("btn--loading");
+      try {
+        await apiClient.verifyBiometry(biometricSession?.token ?? "offline-demo", {
+          image: capturedImage,
+          metadata: {
+            device: navigator.userAgent,
+            timestamp: new Date().toISOString(),
+          },
+        });
+
+        showToast("success", "Biometria validada", "Identidade confirmada com sucesso.");
+        biometricSession = null;
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+        }
+        currentView = "dashboard";
+        render();
+      } catch (error) {
+        statusEl.textContent = error.message;
+        statusEl.classList.add("error");
+        showToast("error", "Falha na biometria", error.message);
+      } finally {
+        confirmBtn.classList.remove("btn--loading");
+      }
+    });
+  }
+
+  if (skipBtn) {
+    skipBtn.addEventListener("click", () => {
+      showToast("warning", "Biometria pendente", "Você poderá validar novamente no próximo acesso.");
+      biometricSession = null;
+      currentView = "dashboard";
+      render();
+    });
+  }
+}
+
 function attachGlobalEvents() {
   // nav items
   document.querySelectorAll("[data-nav]").forEach((el) => {
-    el.addEventListener("click", () => {
-      currentView = el.dataset.nav;
-      render();
-    });
+    if (!el.dataset.bound) {
+      el.dataset.bound = 'true';
+      el.addEventListener("click", () => {
+        currentView = el.dataset.nav;
+        render();
+      });
+    }
   });
   // buy crypto buttons
   document.querySelectorAll("[data-buy]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const simbolo = btn.dataset.buy;
-      openBuyModal(simbolo);
-    });
+    if (!btn.dataset.bound) {
+      btn.dataset.bound = 'true';
+      btn.addEventListener("click", () => {
+        const simbolo = btn.dataset.buy;
+        openBuyModal(simbolo);
+      });
+    }
   });
+
+  const refreshBtn = document.getElementById('refresh-market');
+  if (refreshBtn && !refreshBtn.dataset.bound) {
+    refreshBtn.dataset.bound = 'true';
+    refreshBtn.addEventListener('click', () => {
+      refreshMarketData();
+    });
+  }
+
+  const downloadBtn = document.getElementById('download-compliance');
+  if (downloadBtn && !downloadBtn.dataset.bound) {
+    downloadBtn.dataset.bound = 'true';
+    downloadBtn.addEventListener('click', async () => {
+      downloadBtn.classList.add('btn--loading');
+      try {
+        const report = await apiClient.exportReport();
+        const blob = new Blob([report.content], { type: report.mime });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = report.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('success', 'Relatório exportado', 'O arquivo foi gerado com sucesso.');
+      } catch (error) {
+        showToast('error', 'Erro ao exportar', error.message);
+      } finally {
+        downloadBtn.classList.remove('btn--loading');
+      }
+    });
+  }
+
+  const withdrawBtn = document.getElementById('quick-withdraw');
+  if (withdrawBtn && !withdrawBtn.dataset.bound) {
+    withdrawBtn.dataset.bound = 'true';
+    withdrawBtn.addEventListener('click', () => {
+      showToast('info', 'Fluxo de saque', 'A validação de saque está disponível no módulo de simulação.');
+    });
+  }
+}
+
+function attachTransactionEvents() {
+  const form = document.getElementById('simulation-form');
+  if (form && !form.dataset.bound) {
+    form.dataset.bound = 'true';
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (!currentUser) {
+        showToast('error', 'Sessão expirada', 'Faça login novamente para simular.');
+        currentView = 'login';
+        render();
+        return;
+      }
+
+      const type = document.getElementById('simulation-type').value;
+      const value = parseFloat(document.getElementById('simulation-value').value);
+      const recipient = document.getElementById('simulation-recipient').value.trim();
+      const description = document.getElementById('simulation-description').value.trim();
+
+      if (Number.isNaN(value) || value <= 0) {
+        showToast('error', 'Valor inválido', 'Informe um valor positivo.');
+        return;
+      }
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.classList.add('btn--loading');
+
+      try {
+        const payload = {
+          userId: currentUser.id,
+          tipo: type,
+          valor: value,
+          destinatario: recipient,
+          descricao: description,
+        };
+
+        const result = await apiClient.simulateTransaction(payload);
+        lastSimulation = { ...result.receipt };
+        const resultContainer = document.getElementById('simulation-result');
+        if (resultContainer) {
+          resultContainer.innerHTML = renderSimulationSummary(lastSimulation);
+          attachTransactionEvents();
+        }
+        showToast('success', 'Simulação aprovada', `Total debitado: ${formatBRL(result.total)}`);
+      } catch (error) {
+        showToast('error', 'Falha na simulação', error.message);
+      } finally {
+        submitBtn.classList.remove('btn--loading');
+      }
+    });
+  }
+
+  const downloadReceiptBtn = document.getElementById('download-receipt');
+  if (downloadReceiptBtn && lastSimulation && !downloadReceiptBtn.dataset.bound) {
+    downloadReceiptBtn.dataset.bound = 'true';
+    downloadReceiptBtn.addEventListener('click', () => {
+      const content = [
+        `Protocolo: ${lastSimulation.protocolo}`,
+        `Data/Hora: ${new Date(lastSimulation.timestamp).toLocaleString('pt-BR')}`,
+        `Tipo: ${lastSimulation.tipo}`,
+        `Favorecido: ${lastSimulation.favorecido}`,
+        `Valor: ${formatBRL(lastSimulation.valor)}`,
+        `Taxa: ${formatBRL(lastSimulation.taxa ?? 0)}`,
+        `Total: ${formatBRL(lastSimulation.total ?? lastSimulation.valor)}`,
+      ].join('\n');
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `comprovante-simulacao-${lastSimulation.protocolo}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  }
 }
 
 function drawSparklines() {
@@ -898,6 +1468,133 @@ function drawSparklines() {
       });
     }
   });
+}
+
+async function hydrateDashboard() {
+  if (!currentUser) return;
+
+  try {
+    const [market, dashboard] = await Promise.all([
+      apiClient.fetchMarket(),
+      apiClient.fetchDashboard(currentUser.id),
+    ]);
+
+    marketSnapshot = market;
+    dashboardData = dashboard;
+
+    const previousCryptos = cryptos.slice();
+    cryptos = market.map((asset) => {
+      const base = previousCryptos.find((c) => c.simbolo === asset.symbol) ?? {};
+      const change = Number(asset.change24h ?? base.variacao_24h ?? 0);
+      return {
+        nome: asset.name ?? base.nome ?? asset.symbol,
+        simbolo: asset.symbol ?? base.simbolo ?? asset.name,
+        preco_usd: Number(asset.price ?? base.preco_usd ?? 0),
+        variacao_24h: parseFloat(change.toFixed(2)),
+        volume_24h: asset.volume24h ?? base.volume_24h ?? "--",
+        icone_cor: base.icone_cor ?? "#1FB8CD",
+      };
+    });
+    updateDashboardUI();
+  } catch (error) {
+    console.warn("hydrateDashboard", error);
+    showToast('warning', 'Dados offline', 'Exibindo dados simulados.');
+  }
+}
+
+async function refreshMarketData() {
+  try {
+    const market = await apiClient.fetchMarket();
+    marketSnapshot = market;
+    const previousCryptos = cryptos.slice();
+    cryptos = market.map((asset) => {
+      const base = previousCryptos.find((c) => c.simbolo === asset.symbol) ?? {};
+      const change = Number(asset.change24h ?? base.variacao_24h ?? 0);
+      return {
+        nome: asset.name ?? base.nome ?? asset.symbol,
+        simbolo: asset.symbol ?? base.simbolo ?? asset.name,
+        preco_usd: Number(asset.price ?? base.preco_usd ?? 0),
+        variacao_24h: parseFloat(change.toFixed(2)),
+        volume_24h: asset.volume24h ?? base.volume_24h ?? "--",
+        icone_cor: base.icone_cor ?? "#1FB8CD",
+      };
+    });
+    showToast('success', 'Mercado atualizado', 'Cotações sincronizadas com sucesso.');
+    updateDashboardUI();
+  } catch (error) {
+    showToast('error', 'Falha na atualização', error.message);
+  }
+}
+
+function updateDashboardUI() {
+  if (currentView !== 'dashboard') return;
+
+  const balances = dashboardData?.balances ?? {
+    brl: currentUser?.saldo_brl ?? 0,
+    usd: currentUser?.saldo_usd ?? 0,
+    crypto: 0,
+  };
+
+  const compliance = dashboardData?.compliance ?? { status: 'Em análise', score: 80 };
+
+  const brlEl = document.getElementById('dashboard-balance-brl');
+  if (brlEl) brlEl.textContent = formatBRL(balances.brl);
+
+  const usdEl = document.getElementById('dashboard-balance-usd');
+  if (usdEl) usdEl.textContent = formatUSD(balances.usd);
+
+  const cryptoEl = document.getElementById('dashboard-crypto-btc');
+  if (cryptoEl) {
+    cryptoEl.textContent = `${(balances.crypto ?? 0).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
+    })} BTC`;
+  }
+
+  const complianceStatusEl = document.getElementById('dashboard-compliance-status');
+  if (complianceStatusEl) complianceStatusEl.textContent = compliance.status;
+
+  const complianceScoreEl = document.getElementById('dashboard-compliance-score');
+  if (complianceScoreEl) complianceScoreEl.textContent = `${compliance.score}%`;
+
+  const marketBody = document.querySelector('#crypto-table tbody');
+  if (marketBody) {
+    marketBody.innerHTML = cryptos
+      .map(
+        (c, idx) => `<tr>
+          <td><span style="display:flex;align-items:center;gap:8px;"><span style="width:16px;height:16px;background:${c.icone_cor};border-radius:50%;display:inline-block;"></span>${c.nome}</span></td>
+          <td>${formatUSD(Number(c.preco_usd))}</td>
+          <td><canvas id="spark-${idx}" class="sparkline"></canvas></td>
+          <td>${c.volume_24h}</td>
+          <td style="color:${c.variacao_24h >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">${
+            c.variacao_24h >= 0 ? '+' : ''
+          }${c.variacao_24h}%</td>
+          <td><button class="btn btn--sm btn--primary" data-buy="${c.simbolo}">Comprar</button></td>
+        </tr>`
+      )
+      .join('');
+    drawSparklines();
+    attachGlobalEvents();
+  }
+}
+
+async function hydrateTransactions() {
+  try {
+    const apiTransactions = await apiRequest('/transactions', {
+      fallback: () => transactions,
+    });
+
+    if (Array.isArray(apiTransactions)) {
+      transactions = apiTransactions;
+      const container = document.querySelector('#transactions-table-wrapper');
+      if (container) {
+        container.innerHTML = renderTransactionsTable();
+        attachTransactionEvents();
+      }
+    }
+  } catch (error) {
+    console.warn('hydrateTransactions', error.message);
+  }
 }
 
 /****************************
