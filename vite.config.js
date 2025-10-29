@@ -15,10 +15,12 @@ export default defineConfig({
   },
   server: {
     port: 5000,
+    host: '0.0.0.0', // Permite acesso externo (VM → MacBook)
     open: '/index-modular.html',
   },
   preview: {
     port: 5000,
+    host: '0.0.0.0', // Permite acesso externo (VM → MacBook)
   },
   resolve: {
     alias: {
