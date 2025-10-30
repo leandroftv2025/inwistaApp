@@ -19,6 +19,7 @@ import {
   validateEmail,
   validateUsername,
 } from '../../utils/validators.js';
+import logoImage from '../../assets/Logo3.PNG';
 
 export class Login {
   render() {
@@ -33,7 +34,7 @@ export class Login {
         <div class="login-left">
           <div class="login-left__content">
             <div class="login-left__logo">
-              <img src="/imagens/Logo3.PNG?v=${Date.now()}" alt="Logo Inwista" class="logo-image" />
+              <img src="${logoImage}" alt="Logo Inwista" class="logo-image" />
             </div>
           </div>
         </div>
