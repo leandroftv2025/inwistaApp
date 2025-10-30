@@ -33,7 +33,7 @@ export class Login {
         <div class="login-left">
           <div class="login-left__content">
             <div class="login-left__logo">
-              <img src="/imagens/Logo3.PNG" alt="Logo Inwista" class="logo-image" />
+              <img src="/imagens/Logo3.PNG?v=${Date.now()}" alt="Logo Inwista" class="logo-image" />
             </div>
           </div>
         </div>
