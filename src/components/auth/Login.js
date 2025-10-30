@@ -33,10 +33,7 @@ export class Login {
         <div class="login-left">
           <div class="login-left__content">
             <div class="login-left__logo">
-              <div class="logo-inwista">
-                <div class="logo-symbol" title="Inwista">S</div>
-                <div class="logo-text">Inwista</div>
-              </div>
+              <img src="/imagens/Logo3.PNG" alt="Logo Inwista" class="logo-image" />
             </div>
           </div>
         </div>
